@@ -5,7 +5,7 @@ pipeline {
   // agent defines where the pipeline will run.
   agent {
     label {
-      label("newbuildtest")
+      label("ndw1926")
     }
   }
 
