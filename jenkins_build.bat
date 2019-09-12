@@ -11,4 +11,4 @@ rmdir /q /s %INSTALL_ROOT%
 mkdir cmake-build
 cd cmake-build
 cmake -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DCMAKE_INSTALL_PREFIX=%INSTALL_ROOT% ..
-cmake --build . --target install
+cmake --build . --target install --config %BUILD_TYPE%
