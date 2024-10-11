@@ -24,6 +24,11 @@ rmdir /q /s %INSTALL_ROOT%
 mkdir cmake-build
 cd cmake-build
 
+for %%X in (cmake.exe) do ( set "FOUND_CMAKE=%%~$PATH:X" )
+if not exist "%FOUND_CMAKE%" (
+    set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
+)
+
 cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DCMAKE_INSTALL_PREFIX=%INSTALL_ROOT% ^
    -DOPENSSL_ROOT_DIR=%TOPDIR%openssl-3.0\x64 -DMYSQL_ROOT_DIR=%TOPDIR%mysql-8.4.2-winx64 ..
 if %errorlevel% neq 0 exit /b %errorlevel%
