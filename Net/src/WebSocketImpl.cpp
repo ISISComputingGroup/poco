@@ -11,8 +11,9 @@
 // SPDX-License-Identifier:	BSL-1.0
 //
 
-
-#define NOMINMAX
+#ifndef NOMINMAX
+	#define NOMINMAX
+#endif // NOMINMAX
 #include "Poco/Net/WebSocketImpl.h"
 #include "Poco/Net/NetException.h"
 #include "Poco/Net/WebSocket.h"
@@ -203,6 +204,7 @@ int WebSocketImpl::receiveBytes(void* buffer, int length, int)
 {
 	char mask[4];
 	bool useMask;
+	_frameFlags = 0;
 	int payloadLength = receiveHeader(mask, useMask);
 	if (payloadLength <= 0)
 		return payloadLength;
@@ -212,10 +214,11 @@ int WebSocketImpl::receiveBytes(void* buffer, int length, int)
 }
 
 
-int WebSocketImpl::receiveBytes(Poco::Buffer<char>& buffer, int)
+int WebSocketImpl::receiveBytes(Poco::Buffer<char>& buffer, int, const Poco::Timespan&)
 {
 	char mask[4];
 	bool useMask;
+	_frameFlags = 0;
 	int payloadLength = receiveHeader(mask, useMask);
 	if (payloadLength <= 0)
 		return payloadLength;

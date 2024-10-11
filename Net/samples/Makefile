@@ -5,7 +5,7 @@
 #
 
 .PHONY: projects
-clean all: projects
+clean distclean all: projects
 projects:
 	$(MAKE) -C dict $(MAKECMDGOALS)
 	$(MAKE) -C TimeServer $(MAKECMDGOALS)
@@ -20,3 +20,4 @@ projects:
 	$(MAKE) -C WebSocketServer $(MAKECMDGOALS)
 	$(MAKE) -C SMTPLogger $(MAKECMDGOALS)
 	$(MAKE) -C ifconfig $(MAKECMDGOALS)
+	$(MAKE) -C tcpserver $(MAKECMDGOALS)

@@ -14,6 +14,9 @@
 #include "Poco/ClassLoader.h"
 #include "Poco/Manifest.h"
 #include "Poco/Exception.h"
+#include "Poco/Path.h"
+#include "Poco/File.h"
+#include "Poco/Format.h"
 #include "TestPlugin.h"
 
 
@@ -23,6 +26,8 @@ using Poco::SharedLibrary;
 using Poco::AbstractMetaObject;
 using Poco::NotFoundException;
 using Poco::InvalidAccessException;
+using Poco::Path;
+using Poco::File;
 
 
 ClassLoaderTest::ClassLoaderTest(const std::string& name): CppUnit::TestCase(name)
@@ -37,17 +42,15 @@ ClassLoaderTest::~ClassLoaderTest()
 
 void ClassLoaderTest::testClassLoader1()
 {
-	std::string path = "TestLibrary";
-	path.append(SharedLibrary::suffix());
-
+	std::string libraryPath = getFullName("TestLibrary");
 	ClassLoader<TestPlugin> cl;
 
-	assert (cl.begin() == cl.end());
+	assertTrue (cl.begin() == cl.end());
 	assertNullPtr (cl.findClass("PluginA"));
-	assertNullPtr (cl.findManifest(path));
-	
-	assert (!cl.isLibraryLoaded(path));
-	
+	assertNullPtr (cl.findManifest(libraryPath));
+
+	assertTrue (!cl.isLibraryLoaded(libraryPath));
+
 	try
 	{
 		const ClassLoader<TestPlugin>::Meta& POCO_UNUSED meta = cl.classFor("PluginA");
@@ -63,7 +66,7 @@ void ClassLoaderTest::testClassLoader1()
 
 	try
 	{
-		const ClassLoader<TestPlugin>::Manif& POCO_UNUSED manif = cl.manifestFor(path);
+		const ClassLoader<TestPlugin>::Manif& POCO_UNUSED manif = cl.manifestFor(libraryPath);
 		fail("not found - must throw exception");
 	}
 	catch (NotFoundException&)
@@ -78,48 +81,46 @@ void ClassLoaderTest::testClassLoader1()
 
 void ClassLoaderTest::testClassLoader2()
 {
-	std::string path = "TestLibrary";
-	path.append(SharedLibrary::suffix());
-
+	std::string libraryPath = getFullName("TestLibrary");
 	ClassLoader<TestPlugin> cl;
-	cl.loadLibrary(path);
+	cl.loadLibrary(libraryPath);
 
-	assert (cl.begin() != cl.end());
+	assertTrue (cl.begin() != cl.end());
 	assertNotNullPtr (cl.findClass("PluginA"));
 	assertNotNullPtr (cl.findClass("PluginB"));
 	assertNotNullPtr (cl.findClass("PluginC"));
-	assertNotNullPtr (cl.findManifest(path));
-	
-	assert (cl.isLibraryLoaded(path));
-	assert (cl.manifestFor(path).size() == 3);
-	
+	assertNotNullPtr (cl.findManifest(libraryPath));
+
+	assertTrue (cl.isLibraryLoaded(libraryPath));
+	assertTrue (cl.manifestFor(libraryPath).size() == 3);
+
 	ClassLoader<TestPlugin>::Iterator it = cl.begin();
-	assert (it != cl.end());
-	assert (it->first == path);
-	assert (it->second->size() == 3);
+	assertTrue (it != cl.end());
+	assertTrue (it->first == libraryPath);
+	assertTrue (it->second->size() == 3);
 	++it;
-	assert (it == cl.end());
-	
+	assertTrue (it == cl.end());
+
 	TestPlugin* pPluginA = cl.classFor("PluginA").create();
-	assert (pPluginA->name() == "PluginA");
-	assert (!cl.classFor("PluginA").isAutoDelete(pPluginA));
+	assertTrue (pPluginA->name() == "PluginA");
+	assertTrue (!cl.classFor("PluginA").isAutoDelete(pPluginA));
 	delete pPluginA;
 
 	TestPlugin* pPluginB = cl.classFor("PluginB").create();
-	assert (pPluginB->name() == "PluginB");
+	assertTrue (pPluginB->name() == "PluginB");
 	delete pPluginB;
-	
+
 	pPluginB = cl.create("PluginB");
-	assert (pPluginB->name() == "PluginB");
+	assertTrue (pPluginB->name() == "PluginB");
 	delete pPluginB;
-	
-	assert (cl.canCreate("PluginA"));
-	assert (cl.canCreate("PluginB"));
-	assert (!cl.canCreate("PluginC"));
+
+	assertTrue (cl.canCreate("PluginA"));
+	assertTrue (cl.canCreate("PluginB"));
+	assertTrue (!cl.canCreate("PluginC"));
 
 	TestPlugin& pluginC = cl.instance("PluginC");
-	assert (pluginC.name() == "PluginC");
-	
+	assertTrue (pluginC.name() == "PluginC");
+
 	try
 	{
 		TestPlugin& POCO_UNUSED plgB = cl.instance("PluginB");
@@ -128,7 +129,7 @@ void ClassLoaderTest::testClassLoader2()
 	catch (InvalidAccessException&)
 	{
 	}
-	
+
 	try
 	{
 		TestPlugin* POCO_UNUSED pPluginC = cl.create("PluginC");
@@ -147,9 +148,9 @@ void ClassLoaderTest::testClassLoader2()
 	catch (InvalidAccessException&)
 	{
 	}
-	
+
 	const AbstractMetaObject<TestPlugin>& meta1 = cl.classFor("PluginC");
-	assert (meta1.isAutoDelete(&(meta1.instance())));
+	assertTrue (meta1.isAutoDelete(&(meta1.instance())));
 
 	// the following must not produce memory leaks
 	const AbstractMetaObject<TestPlugin>& meta2 = cl.classFor("PluginA");
@@ -158,35 +159,59 @@ void ClassLoaderTest::testClassLoader2()
 
 	TestPlugin* pPlugin = meta2.create();
 	meta2.autoDelete(pPlugin);
-	assert (meta2.isAutoDelete(pPlugin));
+	assertTrue (meta2.isAutoDelete(pPlugin));
 	meta2.destroy(pPlugin);
-	assert (!meta2.isAutoDelete(pPlugin));
+	assertTrue (!meta2.isAutoDelete(pPlugin));
 
-	cl.unloadLibrary(path);
+	cl.unloadLibrary(libraryPath);
 }
 
 
 void ClassLoaderTest::testClassLoader3()
 {
-	std::string path = "TestLibrary";
-	path.append(SharedLibrary::suffix());
-
+	std::string libraryPath = getFullName("TestLibrary");
 	ClassLoader<TestPlugin> cl;
-	cl.loadLibrary(path);
-	cl.loadLibrary(path);
-	cl.unloadLibrary(path);
-	
-	assert (cl.manifestFor(path).size() == 3);
-	
+	cl.loadLibrary(libraryPath);
+	cl.loadLibrary(libraryPath);
+	cl.unloadLibrary(libraryPath);
+
+	assertTrue (cl.manifestFor(libraryPath).size() == 3);
+
 	ClassLoader<TestPlugin>::Iterator it = cl.begin();
-	assert (it != cl.end());
-	assert (it->first == path);
-	assert (it->second->size() == 3);
+	assertTrue (it != cl.end());
+	assertTrue (it->first == libraryPath);
+	assertTrue (it->second->size() == 3);
 	++it;
-	assert (it == cl.end());
-	
-	cl.unloadLibrary(path);
-	assertNullPtr (cl.findManifest(path));
+	assertTrue (it == cl.end());
+
+	cl.unloadLibrary(libraryPath);
+	assertNullPtr (cl.findManifest(libraryPath));
+}
+
+
+std::string ClassLoaderTest::getFullName(const std::string& libName)
+{
+	std::string name = Path::expand("$POCO_BASE");
+	char c = Path::separator();
+	std::string OSNAME = Path::expand("$OSNAME");
+	std::string OSARCH = Path::expand("$OSARCH");
+	name.append(1, c)
+		.append(Poco::format("Foundation%ctestsuite%cbin%c", c, c, c))
+		.append(Poco::format("%s%c%s%c", OSNAME, c, OSARCH, c))
+		.append(libName).append(SharedLibrary::suffix());
+
+	// CMake
+	if (!File(name).exists())
+	{
+		name = Path::expand("$POCO_BASE");
+		name.append(Poco::format("%ccmake-build%cbin%c", c, c, c))
+			.append(libName).append(SharedLibrary::suffix());
+	}
+
+	if (!File(name).exists())
+		name = libName + SharedLibrary::suffix();
+
+	return name;
 }
 
 

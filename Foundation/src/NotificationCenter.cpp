@@ -16,7 +16,6 @@
 #include "Poco/Notification.h"
 #include "Poco/Observer.h"
 #include "Poco/AutoPtr.h"
-#include "Poco/SingletonHolder.h"
 
 
 namespace Poco {
@@ -29,6 +28,18 @@ NotificationCenter::NotificationCenter()
 
 NotificationCenter::~NotificationCenter()
 {
+	try
+	{
+		Mutex::ScopedLock lock(_mutex);
+		for (auto& o: _observers)
+			o->disable();
+
+		_observers.clear();
+	}
+	catch(...)
+	{
+		poco_unexpected();
+	}
 }
 
 
@@ -57,8 +68,8 @@ void NotificationCenter::removeObserver(const AbstractObserver& observer)
 bool NotificationCenter::hasObserver(const AbstractObserver& observer) const
 {
 	Mutex::ScopedLock lock(_mutex);
-	for (ObserverList::const_iterator it = _observers.begin(); it != _observers.end(); ++it)
-		if (observer.equals(**it)) return true;
+	for (const auto& p: _observers)
+		if (observer.equals(*p)) return true;
 
 	return false;
 }
@@ -71,9 +82,9 @@ void NotificationCenter::postNotification(Notification::Ptr pNotification)
 	ScopedLockWithUnlock<Mutex> lock(_mutex);
 	ObserverList observersToNotify(_observers);
 	lock.unlock();
-	for (ObserverList::iterator it = observersToNotify.begin(); it != observersToNotify.end(); ++it)
+	for (auto& p: observersToNotify)
 	{
-		(*it)->notify(pNotification);
+		p->notify(pNotification);
 	}
 }
 
@@ -94,15 +105,10 @@ std::size_t NotificationCenter::countObservers() const
 }
 
 
-namespace
-{
-	static SingletonHolder<NotificationCenter> sh;
-}
-
-
 NotificationCenter& NotificationCenter::defaultCenter()
 {
-	return *sh.get();
+	static NotificationCenter nc;
+	return nc;
 }
 
 

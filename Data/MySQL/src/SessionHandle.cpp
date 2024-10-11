@@ -14,9 +14,13 @@
 
 #include "Poco/Data/MySQL/SessionHandle.h"
 #include "Poco/Data/DataException.h"
-#include "Poco/SingletonHolder.h"
 #ifdef POCO_OS_FAMILY_UNIX
 #include <pthread.h>
+#endif
+
+
+#if LIBMYSQL_VERSION_ID >= 80000
+typedef bool my_bool; // Workaround to make library work with MySQL client 8.0 as well as earlier versions
 #endif
 
 
@@ -37,30 +41,29 @@ public:
 		if (pthread_key_create(&_key, &ThreadCleanupHelper::cleanup) != 0)
 			throw Poco::SystemException("cannot create TLS key for mysql cleanup");
 	}
-	
+
 	void init()
 	{
 		if (pthread_setspecific(_key, reinterpret_cast<void*>(1)))
 			throw Poco::SystemException("cannot set TLS key for mysql cleanup");
 	}
-	
+
 	static ThreadCleanupHelper& instance()
 	{
-		return *_sh.get();
+		static ThreadCleanupHelper tch;
+		return tch;
 	}
-	
+
 	static void cleanup(void* data)
 	{
 		mysql_thread_end();
 	}
-	
+
 private:
 	pthread_key_t _key;
-	static Poco::SingletonHolder<ThreadCleanupHelper> _sh;
 };
 
 
-Poco::SingletonHolder<ThreadCleanupHelper> ThreadCleanupHelper::_sh;
 #endif
 
 
@@ -148,14 +151,14 @@ void SessionHandle::close()
 
 void SessionHandle::startTransaction()
 {
-	int rc = mysql_autocommit(_pHandle, false);
+	int rc = mysql_query(_pHandle, "BEGIN");
 	if (rc != 0)
 	{
 		// retry if connection lost
 		int err = mysql_errno(_pHandle);
 		if (err == 2006 /* CR_SERVER_GONE_ERROR */ || err == 2013 /* CR_SERVER_LOST */)
 		{
-			rc = mysql_autocommit(_pHandle, false);
+			rc = mysql_query(_pHandle, "BEGIN");
 		}
 	}
 	if (rc != 0) throw TransactionException("Start transaction failed.", _pHandle);
@@ -176,4 +179,29 @@ void SessionHandle::rollback()
 }
 
 
-}}} // Poco::Data::MySQL
+void SessionHandle::autoCommit(bool val)
+{
+	if (mysql_autocommit(_pHandle, val) != 0)
+		throw TransactionException("Setting autocommit mode failed.", _pHandle);
+}
+
+
+void SessionHandle::reset()
+{
+#if ((defined (MYSQL_VERSION_ID)) && (MYSQL_VERSION_ID >= 50700)) || ((defined (MARIADB_PACKAGE_VERSION_ID)) && (MARIADB_PACKAGE_VERSION_ID >= 30000))
+	if (mysql_reset_connection(_pHandle) != 0)
+#else
+	if (mysql_refresh(_pHandle, REFRESH_TABLES | REFRESH_STATUS | REFRESH_THREADS | REFRESH_READ_LOCK) != 0)
+#endif
+		throw TransactionException("Reset connection failed.", _pHandle);
+}
+
+
+bool SessionHandle::ping()
+{
+	int rc = mysql_ping(_pHandle);
+	return rc == 0;
+}
+
+
+} } } // namespace Poco::Data::MySQL

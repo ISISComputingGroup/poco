@@ -18,7 +18,6 @@
 #include "Poco/DigestEngine.h"
 #include "Poco/MD5Engine.h"
 #include "Poco/SHA1Engine.h"
-#include "Poco/SingletonHolder.h"
 #include <cstring>
 
 
@@ -90,7 +89,7 @@ UUID UUIDGenerator::createFromName(const UUID& nsid, const std::string& name, Di
 	return UUID(buffer, version);
 }
 
-	
+
 UUID UUIDGenerator::createRandom()
 {
 	char buffer[16];
@@ -136,15 +135,26 @@ UUID UUIDGenerator::createOne()
 }
 
 
-namespace
+void UUIDGenerator::seed()
 {
-	static SingletonHolder<UUIDGenerator> sh;
+	Poco::FastMutex::ScopedLock lock(_mutex);
+
+	_random.seed();
+}
+
+
+void UUIDGenerator::seed(UInt32 n)
+{
+	Poco::FastMutex::ScopedLock lock(_mutex);
+
+	_random.seed(n);
 }
 
 
 UUIDGenerator& UUIDGenerator::defaultGenerator()
 {
-	return *sh.get();
+	static UUIDGenerator g;
+	return g;
 }
 
 

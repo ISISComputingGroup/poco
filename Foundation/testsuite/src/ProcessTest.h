@@ -24,11 +24,13 @@ public:
 	ProcessTest(const std::string& name);
 	~ProcessTest();
 
+	void testEscapeArgs();
 	void testLaunch();
 	void testLaunchRedirectIn();
 	void testLaunchRedirectOut();
 	void testLaunchEnv();
 	void testLaunchArgs();
+	void testLaunchInvalidCommand();
 	void testIsRunning();
 
 	void setUp();
@@ -37,6 +39,7 @@ public:
 	static CppUnit::Test* suite();
 
 private:
+	static std::string getFullName(const std::string& name);
 };
 
 

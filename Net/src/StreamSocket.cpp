@@ -51,6 +51,11 @@ StreamSocket::StreamSocket(const Socket& socket): Socket(socket)
 }
 
 
+StreamSocket::StreamSocket(const StreamSocket& socket): Socket(socket)
+{
+}
+
+
 StreamSocket::StreamSocket(SocketImpl* pImpl): Socket(pImpl)
 {
 	if (!dynamic_cast<StreamSocketImpl*>(impl()))
@@ -70,6 +75,50 @@ StreamSocket& StreamSocket::operator = (const Socket& socket)
 	else
 		throw InvalidArgumentException("Cannot assign incompatible socket");
 	return *this;
+}
+
+
+StreamSocket& StreamSocket::operator = (const StreamSocket& socket)
+{
+	Socket::operator = (socket);
+	return *this;
+}
+
+#if POCO_NEW_STATE_ON_MOVE
+
+StreamSocket::StreamSocket(Socket&& socket): Socket(std::move(socket))
+{
+	if (!dynamic_cast<StreamSocketImpl*>(impl()))
+		throw InvalidArgumentException("Cannot assign incompatible socket");
+}
+
+
+StreamSocket::StreamSocket(StreamSocket&& socket): Socket(std::move(socket))
+{
+}
+
+StreamSocket& StreamSocket::operator = (Socket&& socket)
+{
+	Socket::operator = (std::move(socket));
+	return *this;
+}
+
+
+StreamSocket& StreamSocket::operator = (StreamSocket&& socket)
+{
+	Socket::operator = (std::move(socket));
+	return *this;
+}
+
+#endif // POCO_NEW_STATE_ON_MOVE
+
+
+void StreamSocket::bind(const SocketAddress& address, bool reuseAddress, bool ipV6Only)
+{
+	if (address.family() == IPAddress::IPv4)
+		impl()->bind(address, reuseAddress);
+	else
+		impl()->bind6(address, reuseAddress, ipV6Only);
 }
 
 
@@ -96,13 +145,13 @@ void StreamSocket::shutdownReceive()
 	impl()->shutdownReceive();
 }
 
-	
+
 void StreamSocket::shutdownSend()
 {
 	impl()->shutdownSend();
 }
 
-	
+
 void StreamSocket::shutdown()
 {
 	impl()->shutdown();
@@ -112,6 +161,12 @@ void StreamSocket::shutdown()
 int StreamSocket::sendBytes(const void* buffer, int length, int flags)
 {
 	return impl()->sendBytes(buffer, length, flags);
+}
+
+
+int StreamSocket::sendBytes(const SocketBufVec& buffers, int flags)
+{
+	return impl()->sendBytes(buffers, flags);
 }
 
 
@@ -131,6 +186,18 @@ int StreamSocket::receiveBytes(void* buffer, int length, int flags)
 }
 
 
+int StreamSocket::receiveBytes(SocketBufVec& buffers, int flags)
+{
+	return impl()->receiveBytes(buffers, flags);
+}
+
+
+int StreamSocket::receiveBytes(Poco::Buffer<char>& buffer, int flags, const Poco::Timespan& timeout)
+{
+	return impl()->receiveBytes(buffer, flags, timeout);
+}
+
+
 int StreamSocket::receiveBytes(FIFOBuffer& fifoBuf)
 {
 	ScopedLock<Mutex> l(fifoBuf.mutex());
@@ -146,5 +213,9 @@ void StreamSocket::sendUrgent(unsigned char data)
 	impl()->sendUrgent(data);
 }
 
+Poco::Int64 StreamSocket::sendFile(FileInputStream &fileInputStream, Poco::UInt64 offset)
+{
+	return impl()->sendFile(fileInputStream, offset);
+}
 
 } } // namespace Poco::Net

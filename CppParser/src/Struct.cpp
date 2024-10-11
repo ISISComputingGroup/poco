@@ -62,7 +62,7 @@ void Struct::addBase(const std::string& name, Symbol::Access access, bool isVirt
 	_bases.push_back(base);
 }
 
-	
+
 Struct::BaseIterator Struct::baseBegin() const
 {
 	return _bases.begin();
@@ -78,7 +78,7 @@ Struct::BaseIterator Struct::baseEnd() const
 void Struct::addDerived(Struct* pClass)
 {
 	poco_check_ptr (pClass);
-	
+
 	_derived.push_back(pClass);
 }
 
@@ -249,6 +249,30 @@ std::string Struct::toString() const
 	}
 	ostr << "};\n";
 	return ostr.str();
+}
+
+
+Symbol* Struct::lookup(const std::string& name) const
+{
+	Symbol* pSymbol = NameSpace::lookup(name);
+	if (!pSymbol)
+	{
+		for (BaseIterator it = baseBegin(); it != baseEnd(); ++it)
+		{
+			if (it->access != Symbol::ACC_PRIVATE)
+			{
+				if (it->pClass)
+				{
+					pSymbol = it->pClass->lookup(name);
+					if (pSymbol)
+					{
+						return pSymbol;
+					}
+				}
+			}
+		}
+	}
+	return pSymbol;
 }
 
 

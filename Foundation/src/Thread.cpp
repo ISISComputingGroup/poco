@@ -21,11 +21,7 @@
 
 
 #if defined(POCO_OS_FAMILY_WINDOWS)
-#if defined(_WIN32_WCE)
-#include "Thread_WINCE.cpp"
-#else
 #include "Thread_WIN32.cpp"
-#endif
 #elif defined(POCO_VXWORKS)
 #include "Thread_VX.cpp"
 #else
@@ -37,6 +33,7 @@ namespace Poco {
 
 
 namespace {
+
 
 class RunnableHolder: public Runnable
 {
@@ -87,21 +84,27 @@ private:
 } // namespace
 
 
-Thread::Thread(): 
-	_id(uniqueId()), 
-	_name(makeName()), 
+Thread::Thread(uint32_t sigMask):
+	_id(uniqueId()),
 	_pTLS(0),
 	_event(true)
 {
+	setNameImpl(makeName());
+#if defined(POCO_OS_FAMILY_UNIX)
+	setSignalMaskImpl(sigMask);
+#endif
 }
 
 
-Thread::Thread(const std::string& name): 
-	_id(uniqueId()), 
-	_name(name), 
+Thread::Thread(const std::string& name, uint32_t sigMask):
+	_id(uniqueId()),
 	_pTLS(0),
 	_event(true)
 {
+	setNameImpl(name);
+#if defined(POCO_OS_FAMILY_UNIX)
+	setSignalMaskImpl(sigMask);
+#endif
 }
 
 
@@ -126,6 +129,12 @@ Thread::Priority Thread::getPriority() const
 void Thread::start(Runnable& target)
 {
 	startImpl(new RunnableHolder(target));
+}
+
+
+void Thread::start(Poco::SharedPtr<Runnable> pTarget)
+{
+	startImpl(pTarget);
 }
 
 
@@ -203,9 +212,7 @@ int Thread::uniqueId()
 
 void Thread::setName(const std::string& name)
 {
-	FastMutex::ScopedLock lock(_mutex);
-
-	_name = name;
+	setNameImpl(name);
 }
 
 

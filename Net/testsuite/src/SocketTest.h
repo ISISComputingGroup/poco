@@ -25,6 +25,7 @@ public:
 	~SocketTest();
 
 	void testEcho();
+	void testMoveStreamSocket();
 	void testPoll();
 	void testAvailable();
 	void testFIFOBuffer();
@@ -41,6 +42,8 @@ public:
 	void testSelect2();
 	void testSelect3();
 	void testEchoUnixLocal();
+	void testUnixLocalAbstract();
+	void testUseFd();
 
 	void setUp();
 	void tearDown();
@@ -51,10 +54,10 @@ private:
 	void onReadable(bool& b);
 	void onWritable(bool& b);
 
-	int _readableToNot;
-	int _notToReadable;
-	int _writableToNot;
-	int _notToWritable;
+	int _readableToNot = 0;
+	int _notToReadable = 0;
+	int _writableToNot = 0;
+	int _notToWritable = 0;
 };
 
 

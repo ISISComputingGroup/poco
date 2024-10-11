@@ -34,8 +34,22 @@
 
 
 namespace Poco {
+
 namespace JSON {
 
+class JSON_API Object;
+
+}
+
+#if defined(POCO_OS_FAMILY_WINDOWS)
+// Explicitly instatiated shared pointer in JSON library
+extern template class Poco::SharedPtr<Poco::JSON::Object>;
+#else
+// Explicitly instatiated shared pointer in JSON library
+extern template class JSON_API Poco::SharedPtr<Poco::JSON::Object>;
+#endif
+
+namespace JSON {
 
 class JSON_API Object
 	/// Represents a JSON object. Object provides a representation based on
@@ -60,12 +74,12 @@ class JSON_API Object
 	///
 {
 public:
-	typedef SharedPtr<Object>                   Ptr;
-	typedef std::map<std::string, Dynamic::Var> ValueMap;
-	typedef ValueMap::value_type                ValueType;
-	typedef ValueMap::iterator                  Iterator;
-	typedef ValueMap::const_iterator            ConstIterator;
-	typedef std::vector<std::string>            NameList;
+	using Ptr = SharedPtr<Object>;
+	using ValueMap = std::map<std::string, Dynamic::Var>;
+	using ValueType = ValueMap::value_type;
+	using Iterator = ValueMap::iterator;
+	using ConstIterator = ValueMap::const_iterator;
+	using NameList = std::vector<std::string>;
 
 	explicit Object(int options = 0);
 		/// Creates an empty Object.
@@ -84,28 +98,30 @@ public:
 		/// Struct is not copied to keep the operation as
 		/// efficient as possible (when needed, it will be generated upon request).
 
-#ifdef POCO_ENABLE_CPP11
-
-	Object(Object&& other);
+	Object(Object&& other) noexcept;
 		/// Move constructor
 
-	Object &operator =(Object &&other);
-		// Move asignment operator
-
-#endif // POCO_ENABLE_CPP11
-
-	virtual ~Object();
+	~Object();
 		/// Destroys the Object.
 
-	Object &operator =(const Object &other);
+	Object &operator = (const Object &other);
 		// Assignment operator
+
+	Object &operator = (Object &&other) noexcept;
+		// Move asignment operator
 
 	void setEscapeUnicode(bool escape = true);
 		/// Sets the flag for escaping unicode.
 
 	bool getEscapeUnicode() const;
 		/// Returns the flag for escaping unicode.
+	
+	void setLowercaseHex(bool lowercaseHex);
+		/// Sets the flag for using lowercase hex numbers
 
+	bool getLowercaseHex() const;
+		/// Returns the flag for using lowercase hex numbers
+	
 	Iterator begin();
 		/// Returns begin iterator for values.
 
@@ -209,7 +225,7 @@ public:
 	std::size_t size() const;
 		/// Returns the number of properties.
 
-	void set(const std::string& key, const Dynamic::Var& value);
+	Object& set(const std::string& key, const Dynamic::Var& value);
 		/// Sets a new value.
 
 	void stringify(std::ostream& out, unsigned int indent = 0, int step = -1) const;
@@ -224,6 +240,12 @@ public:
 	static Poco::DynamicStruct makeStruct(const Object::Ptr& obj);
 		/// Utility function for creation of struct.
 
+	static Poco::OrderedDynamicStruct makeOrderedStruct(const Object::Ptr& obj);
+		/// Utility function for creation of ordered struct.
+
+	operator const Poco::OrderedDynamicStruct& () const;
+		/// Cast operator to Poco::OrderedDynamiStruct.
+
 	operator const Poco::DynamicStruct& () const;
 		/// Cast operator to Poco::DynamiStruct.
 
@@ -235,15 +257,25 @@ public:
 private:
 	typedef std::deque<ValueMap::const_iterator>  KeyList;
 	typedef Poco::DynamicStruct::Ptr              StructPtr;
+	typedef Poco::OrderedDynamicStruct::Ptr       OrdStructPtr;
 
-	void resetDynStruct() const;
 	void syncKeys(const KeyList& keys);
+
+	template <typename T>
+	void resetDynStruct(T& pStruct) const
+	{
+		if (!pStruct)
+			pStruct = new typename T::Type;
+		else
+			pStruct->clear();
+	}
 
 	template <typename C>
 	void doStringify(const C& container, std::ostream& out, unsigned int indent, unsigned int step) const
 	{
 		int options = Poco::JSON_WRAP_STRINGS;
 		options |= _escapeUnicode ? Poco::JSON_ESCAPE_UNICODE : 0;
+		options |= _lowercaseHex ? Poco::JSON_LOWERCASE_HEX : 0;
 
 		out << '{';
 
@@ -256,7 +288,7 @@ private:
 			for (unsigned int i = 0; i < indent; i++) out << ' ';
 
 			Stringifier::stringify(getKey(it), out, indent, step, options);
-			out << ((indent > 0) ? " : " : ":");
+			out << ((indent > 0) ? ": " : ":");
 
 			Stringifier::stringify(getValue(it), out, indent + step, step, options);
 
@@ -272,6 +304,59 @@ private:
 		out << '}';
 	}
 
+	template <typename S>
+	static S makeStructImpl(const Object::Ptr& obj)
+	{
+		S ds;
+
+		if (obj->_preserveInsOrder)
+		{
+			KeyList::const_iterator it = obj->_keys.begin();
+			KeyList::const_iterator end = obj->_keys.end();
+			for (; it != end; ++it)
+			{
+				if (obj->isObject((*it)->first))
+				{
+					Object::Ptr pObj = obj->getObject((*it)->first);
+					S str = makeStructImpl<S>(pObj);
+					ds.insert((*it)->first, str);
+				}
+				else if (obj->isArray((*it)->first))
+				{
+					Array::Ptr pArr = obj->getArray((*it)->first);
+					std::vector<Poco::Dynamic::Var> v = Poco::JSON::Array::makeArray(pArr);
+					ds.insert((*it)->first, v);
+				}
+				else
+					ds.insert((*it)->first, (*it)->second);
+			}
+		}
+		else
+		{
+			ConstIterator it = obj->begin();
+			ConstIterator end = obj->end();
+			for (; it != end; ++it)
+			{
+				if (obj->isObject(it))
+				{
+					Object::Ptr pObj = obj->getObject(it->first);
+					S str = makeStructImpl<S>(pObj);
+					ds.insert(it->first, str);
+				}
+				else if (obj->isArray(it))
+				{
+					Array::Ptr pArr = obj->getArray(it->first);
+					std::vector<Poco::Dynamic::Var> v = Poco::JSON::Array::makeArray(pArr);
+					ds.insert(it->first, v);
+				}
+				else
+					ds.insert(it->first, it->second);
+			}
+		}
+
+		return ds;
+	}
+
 	const std::string& getKey(ValueMap::const_iterator& it) const;
 	const Dynamic::Var& getValue(ValueMap::const_iterator& it) const;
 	const std::string& getKey(KeyList::const_iterator& it) const;
@@ -285,8 +370,10 @@ private:
 	//  because Object can be returned stringified from Dynamic::Var::toString(),
 	//  so it must know whether to escape unicode or not.
 	bool              _escapeUnicode;
-	mutable StructPtr _pStruct;
-	mutable bool      _modified;
+	bool              _lowercaseHex;
+	mutable StructPtr    _pStruct;
+	mutable OrdStructPtr _pOrdStruct;
+	mutable bool         _modified;
 };
 
 
@@ -303,6 +390,17 @@ inline void Object::setEscapeUnicode(bool escape)
 inline bool Object::getEscapeUnicode() const
 {
 	return _escapeUnicode;
+}
+
+inline void Object::setLowercaseHex(bool lowercaseHex)
+{
+	_lowercaseHex = lowercaseHex;
+}
+
+
+inline bool Object::getLowercaseHex() const
+{
+	return _lowercaseHex;
 }
 
 
@@ -378,7 +476,6 @@ inline std::size_t Object::size() const
 
 inline void Object::remove(const std::string& key)
 {
-	_values.erase(key);
 	if (_preserveInsOrder)
 	{
 		KeyList::iterator it = _keys.begin();
@@ -392,6 +489,7 @@ inline void Object::remove(const std::string& key)
 			}
 		}
 	}
+	_values.erase(key);
 	_modified = true;
 }
 
@@ -505,7 +603,7 @@ public:
 	void convert(std::string& s) const
 	{
 		std::ostringstream oss;
-		_val->stringify(oss, 2);
+		_val->stringify(oss);
 		s = oss.str();
 	}
 
@@ -647,7 +745,7 @@ public:
 	void convert(std::string& s) const
 	{
 		std::ostringstream oss;
-		_val.stringify(oss, 2);
+		_val.stringify(oss);
 		s = oss.str();
 	}
 

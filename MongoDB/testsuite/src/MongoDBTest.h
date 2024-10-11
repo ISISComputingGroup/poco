@@ -25,7 +25,17 @@ public:
 	MongoDBTest(const std::string& name);
 
 	virtual ~MongoDBTest();
+	
+	void setUp();
+	void tearDown();
 
+	void testObjectID();
+	void testArray();
+	void testBuildInfo();
+	void testHello();
+	void testConnectURI();
+
+	// Old wire protocol
 	void testInsertRequest();
 	void testQueryRequest();
 	void testDBQueryRequest();
@@ -33,20 +43,33 @@ public:
 	void testDBCountCommand();
 	void testDBCount2Command();
 	void testDeleteRequest();
-	void testBuildInfo();
+
 	void testConnectionPool();
 	void testCursorRequest();
-	void testObjectID();
 	void testCommand();
 	void testUUID();
-	void testConnectURI();
-	void setUp();
-	void tearDown();
+
+	// New wire protocol using OP_CMD
+	void testOpCmdUUID();
+	void testOpCmdHello();
+	void testOpCmdWriteRead();
+	void testOpCmdInsert();
+	void testOpCmdFind();
+	void testOpCmdCursor();
+	void testOpCmdCursorAggregate();
+	void testOpCmdCursorEmptyFirstBatch();
+	void testOpCmdKillCursor();
+	void testOpCmdCount();
+	void testOpCmdDelete();
+	void testOpCmdUnaknowledgedInsert();
+	void testOpCmdConnectionPool();
+	void testOpCmdDropDatabase();
 
 	static CppUnit::Test* suite();
 
 private:
-	static Poco::MongoDB::Connection::Ptr _mongo;
+	static Poco::MongoDB::Connection::Ptr	_mongo;
+	static Poco::Int64						_wireVersion;
 };
 
 

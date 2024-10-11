@@ -26,6 +26,9 @@
 #include "Poco/NumberFormatter.h"
 #include "Poco/DirectoryIterator.h"
 #include "Poco/Exception.h"
+#include "Poco/RotateStrategy.h"
+#include "Poco/ArchiveStrategy.h"
+#include "Poco/PurgeStrategy.h"
 #include <vector>
 
 
@@ -56,6 +59,86 @@ FileChannelTest::~FileChannelTest()
 }
 
 
+void FileChannelTest::testRotateNever()
+{
+	std::string name = filename();
+	try
+	{
+		AutoPtr<FileChannel> pChannel = new FileChannel(name);
+		pChannel->setProperty(FileChannel::PROP_ROTATION, "never");
+		pChannel->open();
+		Message msg("source", "This is a log file entry", Message::PRIO_INFORMATION);
+		for (int i = 0; i < 200; ++i)
+		{
+			pChannel->log(msg);
+		}
+		File f(name);
+		assertTrue (f.exists());
+		f = name + ".0";
+		assertTrue (!f.exists());
+	}
+	catch (...)
+	{
+		remove(name);
+		throw;
+	}
+	remove(name);
+}
+
+
+void FileChannelTest::testFlushing()
+{
+	std::string name = filename();
+	try
+	{
+		AutoPtr<FileChannel> pChannel = new FileChannel(name);
+		pChannel->setProperty(FileChannel::PROP_FLUSH, "false");
+		pChannel->open();
+		Message msg("source", "01234567890123456789", Message::PRIO_INFORMATION);
+		pChannel->log(msg);
+
+		// File shall be there and have content after writing first message.
+		File f(name);
+		assertTrue (f.exists());
+		assertTrue (f.getSize() >= 20);
+
+		Timestamp::TimeDiff noFlushTime;
+		{
+			Timestamp start;
+			for (int i = 0; i < 2000; ++i)
+			{
+				pChannel->log(msg);
+			}
+			pChannel->close();
+			Timestamp end;
+			noFlushTime = end-start;
+		}
+		Timestamp::TimeDiff flushTime;
+		{
+			pChannel->setProperty(FileChannel::PROP_FLUSH, "true");
+			pChannel->open();
+			Timestamp start;
+			for (int i = 0; i < 2000; ++i)
+			{
+				pChannel->log(msg);
+			}
+			pChannel->close();
+			Timestamp end;
+			flushTime = end-start;
+		}
+
+		// Writing to channel with flushing is expected to be slower.
+		assertTrue(flushTime > noFlushTime);
+	}
+	catch (...)
+	{
+		remove(name);
+		throw;
+	}
+	remove(name);
+}
+
+
 void FileChannelTest::testRotateBySize()
 {
 	std::string name = filename();
@@ -70,11 +153,11 @@ void FileChannelTest::testRotateBySize()
 			pChannel->log(msg);
 		}
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 		f = name + ".1";
-		assert (f.exists());
+		assertTrue (f.exists());
 		f = name + ".2";
-		assert (!f.exists());
+		assertTrue (!f.exists());
 	}
 	catch (...)
 	{
@@ -100,9 +183,9 @@ void FileChannelTest::testRotateByAge()
 			Thread::sleep(300);
 		}
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 		f = name + ".1";
-		assert (f.exists());
+		assertTrue (f.exists());
 	}
 	catch (...)
 	{
@@ -131,7 +214,7 @@ void FileChannelTest::testRotateAtTimeDayUTC()
 		}
 		pChannel->log(msg);
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 	}
 	catch (...)
 	{
@@ -160,7 +243,7 @@ void FileChannelTest::testRotateAtTimeDayLocal()
 		}
 		pChannel->log(msg);
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 	}
 	catch (...)
 	{
@@ -189,7 +272,7 @@ void FileChannelTest::testRotateAtTimeHourUTC()
 		}
 		pChannel->log(msg);
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 	}
 	catch (...)
 	{
@@ -218,7 +301,7 @@ void FileChannelTest::testRotateAtTimeHourLocal()
 		}
 		pChannel->log(msg);
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 	}
 	catch (...)
 	{
@@ -247,7 +330,7 @@ void FileChannelTest::testRotateAtTimeMinUTC()
 		}
 		pChannel->log(msg);
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
 	}
 	catch (...)
 	{
@@ -276,7 +359,58 @@ void FileChannelTest::testRotateAtTimeMinLocal()
 		}
 		pChannel->log(msg);
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
+	}
+	catch (...)
+	{
+		remove(name);
+		throw;
+	}
+	remove(name);
+}
+
+
+class RotateByCustomStrategy : public Poco::RotateStrategy
+	/// The file is rotated when the log file
+	/// exceeds a given age.
+	///
+	/// For this to work reliably across all platforms and file systems
+	/// (there are severe issues on most platforms finding out the real
+	/// creation date of a file), the creation date of the file is
+	/// written into the log file as the first entry.
+{
+public:
+	bool mustRotate(Poco::LogFile* pFile)
+	{
+		return pFile->size() > 2000;
+	}
+
+private:
+};
+
+
+void FileChannelTest::testRotateByStrategy()
+{
+	std::string name = filename();
+	try
+	{
+		AutoPtr<FileChannel> pChannel = new FileChannel(name);
+
+		// this test rotates at 2k just like testRotateBySize. Set the prop rotation to 50k to verify that the rotation strategy takes over
+		pChannel->setProperty(FileChannel::PROP_ROTATION, "50 K");
+		pChannel->setRotationStrategy(new RotateByCustomStrategy());
+		pChannel->open();
+		Message msg("source", "This is a log file entry", Message::PRIO_INFORMATION);
+		for (int i = 0; i < 200; ++i)
+		{
+			pChannel->log(msg);
+		}
+		File f(name + ".0");
+		assertTrue(f.exists());
+		f = name + ".1";
+		assertTrue(f.exists());
+		f = name + ".2";
+		assertTrue(!f.exists());
 	}
 	catch (...)
 	{
@@ -302,7 +436,89 @@ void FileChannelTest::testArchive()
 			pChannel->log(msg);
 		}
 		File f(name + ".0");
-		assert (f.exists());
+		assertTrue (f.exists());
+	}
+	catch (...)
+	{
+		remove(name);
+		throw;
+	}
+	remove(name);
+}
+
+
+class ArchiveByCustomNumberStrategy : public Poco::ArchiveStrategy
+	/// A monotonic increasing number is appended to the
+	/// log file name. The most recent archived file
+	/// always has the number zero.
+{
+public:
+	Poco::LogFile* open(Poco::LogFile* pFile)
+	{
+		return pFile;
+	}
+
+
+	Poco::LogFile* archive(Poco::LogFile* pFile)
+	{
+		std::string basePath = pFile->path();
+		delete pFile;
+		int n = -1;
+		std::string path;
+		do
+		{
+			path = basePath;
+			path = path.substr(0, path.length() - 4);
+			path.append("_");
+			NumberFormatter::append(path, ++n);
+			path.append(".log");
+		} while (exists(path));
+
+		while (n >= 0)
+		{
+			std::string oldPath = basePath;
+			if (n > 0)
+			{
+				oldPath = oldPath.substr(0, oldPath.length() - 4);
+				oldPath.append("_");
+				NumberFormatter::append(oldPath, n - 1);
+				oldPath.append(".log");
+			}
+			std::string newPath = basePath;
+			newPath = newPath.substr(0, newPath.length() - 4);
+			newPath.append("_");
+			NumberFormatter::append(newPath, n);
+			newPath.append(".log");
+			moveFile(oldPath, newPath);
+			--n;
+		}
+		return new Poco::LogFile(basePath);
+	}
+};
+
+
+void FileChannelTest::testArchiveByStrategy()
+{
+	std::string name = filename();
+	try
+	{
+		AutoPtr<FileChannel> pChannel = new FileChannel(name);
+		pChannel->setProperty(FileChannel::PROP_ROTATION, "2 K");
+		pChannel->setProperty(FileChannel::PROP_ARCHIVE, "number");
+
+		pChannel->setArchiveStrategy(new ArchiveByCustomNumberStrategy());
+
+		pChannel->open();
+		Message msg("source", "This is a log file entry", Message::PRIO_INFORMATION);
+		for (int i = 0; i < 200; ++i)
+		{
+			pChannel->log(msg);
+		}
+		name = name.substr(0, name.length() - 4);
+		name.append("_0.log");
+		
+		File f(name);
+		assertTrue(f.exists());
 	}
 	catch (...)
 	{
@@ -330,9 +546,9 @@ void FileChannelTest::testCompress()
 		}
 		Thread::sleep(3000); // allow time for background compression
 		File f0(name + ".0.gz");
-		assert (f0.exists());
+		assertTrue (f0.exists());
 		File f1(name + ".1.gz");
-		assert (f1.exists());
+		assertTrue (f1.exists());
 	}
 	catch (...)
 	{
@@ -359,19 +575,19 @@ void FileChannelTest::purgeAge(const std::string& pa)
 			pChannel->log(msg);
 		}
 		File f0(name + ".0");
-		assert(f0.exists());
+		assertTrue (f0.exists());
 		File f1(name + ".1");
-		assert(f1.exists());
+		assertTrue (f1.exists());
 		File f2(name + ".2");
-		assert(f2.exists());
-		
+		assertTrue (f2.exists());
+
 		Thread::sleep(5000);
 		for (int i = 0; i < 50; ++i)
 		{
 			pChannel->log(msg);
 		}
-		
-		assert(!f2.exists());
+
+		assertTrue (!f2.exists());
 	}
 	catch (...)
 	{
@@ -399,11 +615,11 @@ void FileChannelTest::noPurgeAge(const std::string& npa)
 			pChannel->log(msg);
 		}
 		File f0(name + ".0");
-		assert(f0.exists());
+		assertTrue (f0.exists());
 		File f1(name + ".1");
-		assert(f1.exists());
+		assertTrue (f1.exists());
 		File f2(name + ".2");
-		assert(f2.exists());
+		assertTrue (f2.exists());
 
 		Thread::sleep(5000);
 		for (int i = 0; i < 50; ++i)
@@ -411,7 +627,7 @@ void FileChannelTest::noPurgeAge(const std::string& npa)
 			pChannel->log(msg);
 		}
 
-		assert(f2.exists());
+		assertTrue (f2.exists());
 	}
 	catch (...)
 	{
@@ -455,11 +671,11 @@ void FileChannelTest::purgeCount(const std::string& pc)
 			Thread::sleep(50);
 		}
 		File f0(name + ".0");
-		assert(f0.exists());
+		assertTrue (f0.exists());
 		File f1(name + ".1");
-		assert(f1.exists());
+		assertTrue (f1.exists());
 		File f2(name + ".2");
-		assert(!f2.exists());
+		assertTrue (!f2.exists());
 	} catch (...)
 	{
 		remove(name);
@@ -486,11 +702,11 @@ void FileChannelTest::noPurgeCount(const std::string& npc)
 			Thread::sleep(50);
 		}
 		File f0(name + ".0");
-		assert(f0.exists());
+		assertTrue (f0.exists());
 		File f1(name + ".1");
-		assert(f1.exists());
+		assertTrue (f1.exists());
 		File f2(name + ".2");
-		assert(f2.exists());
+		assertTrue (f2.exists());
 	} catch (...)
 	{
 		remove(name);
@@ -526,20 +742,54 @@ void FileChannelTest::testWrongPurgeOption()
 	{
 		pChannel->setProperty(FileChannel::PROP_PURGEAGE, "peace");
 		fail("must fail");
-	} catch (InvalidArgumentException)
+	} catch (InvalidArgumentException&)
 	{
-		assert(pChannel->getProperty(FileChannel::PROP_PURGEAGE) == "5 seconds");
+		assertTrue (pChannel->getProperty(FileChannel::PROP_PURGEAGE) == "5 seconds");
 	}
 
 	try
 	{
 		pChannel->setProperty(FileChannel::PROP_PURGECOUNT, "peace");
 		fail("must fail");
-	} catch (InvalidArgumentException)
+	} catch (InvalidArgumentException&)
 	{
-		assert(pChannel->getProperty(FileChannel::PROP_PURGEAGE) == "5 seconds");
+		assertTrue (pChannel->getProperty(FileChannel::PROP_PURGEAGE) == "5 seconds");
 	}
 
+	remove(name);
+}
+
+
+void FileChannelTest::testPurgeByStrategy()
+{
+	std::string name = filename();
+	try
+	{
+		AutoPtr<FileChannel> pChannel = new FileChannel(name);
+		pChannel->setProperty(FileChannel::PROP_ROTATION, "1 K");
+		pChannel->setProperty(FileChannel::PROP_ARCHIVE, "number");
+		pChannel->setProperty(FileChannel::PROP_PURGECOUNT, "");
+		// simpler to test the type that already exists. A true "custom" purge strategy might be time based or total size based
+		pChannel->setPurgeStrategy(new Poco::PurgeByCountStrategy(2));
+		pChannel->open();
+		Message msg("source", "This is a log file entry", Message::PRIO_INFORMATION);
+		for (int i = 0; i < 200; ++i)
+		{
+			pChannel->log(msg);
+			Thread::sleep(50);
+		}
+		File f0(name + ".0");
+		assertTrue(f0.exists());
+		File f1(name + ".1");
+		assertTrue(f1.exists());
+		File f2(name + ".2");
+		assertTrue(!f2.exists());
+	}
+	catch (...)
+	{
+		remove(name);
+		throw;
+	}
 	remove(name);
 }
 
@@ -634,19 +884,24 @@ CppUnit::Test* FileChannelTest::suite()
 {
 	CppUnit::TestSuite* pSuite = new CppUnit::TestSuite("FileChannelTest");
 
+	CppUnit_addTest(pSuite, FileChannelTest, testRotateNever);
+	CppUnit_addTest(pSuite, FileChannelTest, testFlushing);
 	CppUnit_addTest(pSuite, FileChannelTest, testRotateBySize);
 	CppUnit_addTest(pSuite, FileChannelTest, testRotateByAge);
-	CppUnit_addTest(pSuite, FileChannelTest, testRotateAtTimeDayUTC);
-	CppUnit_addTest(pSuite, FileChannelTest, testRotateAtTimeDayLocal);
-	CppUnit_addTest(pSuite, FileChannelTest, testRotateAtTimeHourUTC);
-	CppUnit_addTest(pSuite, FileChannelTest, testRotateAtTimeHourLocal);
-	CppUnit_addTest(pSuite, FileChannelTest, testRotateAtTimeMinUTC);
-	CppUnit_addTest(pSuite, FileChannelTest, testRotateAtTimeMinLocal);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testRotateAtTimeDayUTC);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testRotateAtTimeDayLocal);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testRotateAtTimeHourUTC);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testRotateAtTimeHourLocal);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testRotateAtTimeMinUTC);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testRotateAtTimeMinLocal);
+	CppUnit_addTest(pSuite, FileChannelTest, testRotateByStrategy);
 	CppUnit_addTest(pSuite, FileChannelTest, testArchive);
+	CppUnit_addTest(pSuite, FileChannelTest, testArchiveByStrategy);
 	CppUnit_addTest(pSuite, FileChannelTest, testCompress);
-	CppUnit_addTest(pSuite, FileChannelTest, testPurgeAge);
+	CppUnit_addLongTest(pSuite, FileChannelTest, testPurgeAge);
 	CppUnit_addTest(pSuite, FileChannelTest, testPurgeCount);
 	CppUnit_addTest(pSuite, FileChannelTest, testWrongPurgeOption);
+	CppUnit_addTest(pSuite, FileChannelTest, testPurgeByStrategy);
 
 	return pSuite;
 }

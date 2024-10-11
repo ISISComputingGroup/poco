@@ -26,23 +26,30 @@ namespace Poco {
 namespace MongoDB {
 
 
+class Message; // Required to disambiguate friend declaration in MessageHeader.
+
+
 class MongoDB_API MessageHeader
-	/// Represents the message header which is always prepended to a 
+	/// Represents the message header which is always prepended to a
 	/// MongoDB request or response message.
 {
 public:
-	static const unsigned int MSG_HEADER_SIZE = 16;
+	static constexpr Int32 MSG_HEADER_SIZE = 16;
 
 	enum OpCode
 	{
+		// Opcodes deprecated in MongoDB 5.0
 		OP_REPLY = 1,
-		OP_MSG = 1000,
 		OP_UPDATE = 2001,
 		OP_INSERT = 2002,
 		OP_QUERY = 2004,
 		OP_GET_MORE = 2005,
 		OP_DELETE = 2006,
-		OP_KILL_CURSORS = 2007
+		OP_KILL_CURSORS = 2007,
+
+		/// Opcodes supported in MongoDB 5.1 and later
+		OP_COMPRESSED = 2012,
+		OP_MSG = 2013
 	};
 
 	explicit MessageHeader(OpCode);
@@ -70,7 +77,7 @@ public:
 		/// Sets the request ID of the current message.
 
 	Int32 responseTo() const;
-		/// Returns the request id from the original request. 
+		/// Returns the request id from the original request.
 
 private:
 	void setMessageLength(Int32 length);

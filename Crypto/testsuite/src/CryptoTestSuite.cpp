@@ -11,7 +11,7 @@
 #include "Poco/Platform.h"
 // see https://www.openssl.org/docs/faq.html
 // and https://github.com/openssl/openssl/blob/master/doc/man3/OPENSSL_Applink.pod
-#if defined(POCO_OS_FAMILY_WINDOWS)
+#if defined(POCO_OS_FAMILY_WINDOWS) && defined(OPENSSL_REQUIRE_APPLINK)
 #include "openssl/applink.c"
 #endif
 #include "CryptoTestSuite.h"
@@ -21,6 +21,7 @@
 #include "EVPTest.h"
 #include "DigestEngineTest.h"
 #include "PKCS12ContainerTest.h"
+#include "EnvelopeTest.h"
 
 
 CppUnit::Test* CryptoTestSuite::suite()
@@ -33,5 +34,6 @@ CppUnit::Test* CryptoTestSuite::suite()
 	pSuite->addTest(EVPTest::suite());
 	pSuite->addTest(DigestEngineTest::suite());
 	pSuite->addTest(PKCS12ContainerTest::suite());
+	pSuite->addTest(EnvelopeTest::suite());
 	return pSuite;
 }

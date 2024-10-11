@@ -47,7 +47,7 @@ TCPServer::TCPServer(TCPServerConnectionFactory::Ptr pFactory, Poco::UInt16 port
 	_socket(ServerSocket(portNumber)),
 	_thread(threadName(_socket)),
 	_stopped(true)
-{	
+{
 	Poco::ThreadPool& pool = Poco::ThreadPool::defaultPool();
 	if (pParams)
 	{
@@ -55,7 +55,7 @@ TCPServer::TCPServer(TCPServerConnectionFactory::Ptr pFactory, Poco::UInt16 port
 		if (toAdd > 0) pool.addCapacity(toAdd);
 	}
 	_pDispatcher = new TCPServerDispatcher(pFactory, pool, pParams);
-	
+
 }
 
 
@@ -111,7 +111,7 @@ void TCPServer::start()
 	_thread.start(*this);
 }
 
-	
+
 void TCPServer::stop()
 {
 	if (!_stopped)
@@ -135,11 +135,11 @@ void TCPServer::run()
 				try
 				{
 					StreamSocket ss = _socket.acceptConnection();
-					
+
 					if (!_pConnectionFilter || _pConnectionFilter->accept(ss))
 					{
 						// enable nodelay per default: OSX really needs that
-#if defined(POCO_OS_FAMILY_UNIX)
+#if defined(POCO_HAS_UNIX_SOCKET)
 						if (ss.address().family() != AddressFamily::UNIX_LOCAL)
 #endif
 						{
@@ -167,7 +167,7 @@ void TCPServer::run()
 			ErrorHandler::handle(exc);
 			// possibly a resource issue since poll() failed;
 			// give some time to recover before trying again
-			Poco::Thread::sleep(50); 
+			Poco::Thread::sleep(50);
 		}
 	}
 }
@@ -184,7 +184,7 @@ int TCPServer::maxThreads() const
 	return _pDispatcher->maxThreads();
 }
 
-	
+
 int TCPServer::totalConnections() const
 {
 	return _pDispatcher->totalConnections();
@@ -202,7 +202,7 @@ int TCPServer::maxConcurrentConnections() const
 	return _pDispatcher->maxConcurrentConnections();
 }
 
-	
+
 int TCPServer::queuedConnections() const
 {
 	return _pDispatcher->queuedConnections();
@@ -225,18 +225,10 @@ void TCPServer::setConnectionFilter(const TCPServerConnectionFilter::Ptr& pConne
 
 std::string TCPServer::threadName(const ServerSocket& socket)
 {
-#if _WIN32_WCE == 0x0800
-	// Workaround for WEC2013: only the first call to getsockname()
-	// succeeds. To mitigate the impact of this bug, do not call
-	// socket.address(), which calls getsockname(), here.
-	std::string name("TCPServer");
-	#pragma message("Using WEC2013 getsockname() workaround in TCPServer::threadName(). Remove when no longer needed.")
-#else
 	std::string name("TCPServer: ");
 	name.append(socket.address().toString());
-#endif
-	return name;
 
+	return name;
 }
 
 
