@@ -43,8 +43,11 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 
 xcopy /y %TOPDIR%mysql-8.4.2-winx64\bin\*.dll %INSTALL_ROOT%\bin
 if %errorlevel% neq 0 exit /b %errorlevel%
-xcopy /y %TOPDIR%mysql-8.4.2-winx64\lib\*.lib %INSTALL_ROOT%\lib
+xcopy /y %TOPDIR%mysql-8.4.2-winx64\lib\libmysql.dll %INSTALL_ROOT%\bin
 if %errorlevel% neq 0 exit /b %errorlevel%
+xcopy /y %TOPDIR%mysql-8.4.2-winx64\lib\libmysql.lib %INSTALL_ROOT%\lib
+if %errorlevel% neq 0 exit /b %errorlevel%
+
 xcopy /y %TOPDIR%openssl-3.0\x64\bin\*.dll %INSTALL_ROOT%\bin
 if %errorlevel% neq 0 exit /b %errorlevel%
 xcopy /y %TOPDIR%openssl-3.0\x64\lib\*.lib %INSTALL_ROOT%\lib
