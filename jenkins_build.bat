@@ -38,7 +38,7 @@ cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
 if %errorlevel% neq 0 exit /b %errorlevel%
 cmake --build . --config %BUILD_TYPE%
 if %errorlevel% neq 0 exit /b %errorlevel%
-cmake --install . --prefix %INSTALL_ROOT%
+cmake --install . --prefix %INSTALL_ROOT% --config %BUILD_TYPE%
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 xcopy /y %TOPDIR%mysql-8.4.2-winx64\bin\*.dll %INSTALL_ROOT%\bin
