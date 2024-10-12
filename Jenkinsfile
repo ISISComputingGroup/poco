@@ -32,8 +32,11 @@ pipeline {
             echo "Building"
             timeout(time: 16, unit: 'HOURS') {
               bat """
-                  jenkins_build.bat
-                  jenkins_build.bat DEBUG
+                  setlocal
+                  call jenkins_build.bat
+                  if %errorlevel% neq 0 exit /b %errorlevel%
+                  call jenkins_build.bat DEBUG
+                  if %errorlevel% neq 0 exit /b %errorlevel%
               """
             }
         }
