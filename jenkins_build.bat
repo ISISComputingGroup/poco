@@ -41,10 +41,17 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 cmake --install . --prefix %INSTALL_ROOT%
 if %errorlevel% neq 0 exit /b %errorlevel%
 
-xcopy /y %TOPDIR%mysql-8.4.2-winx64\bin\*.dll %INSTALL_ROOT%
+xcopy /y %TOPDIR%mysql-8.4.2-winx64\bin\*.dll %INSTALL_ROOT%\bin
 if %errorlevel% neq 0 exit /b %errorlevel%
-xcopy /y %TOPDIR%openssl-3.0\x64\bin\*.dll %INSTALL_ROOT%
+xcopy /y %TOPDIR%mysql-8.4.2-winx64\lib\*.lib %INSTALL_ROOT%\lib
 if %errorlevel% neq 0 exit /b %errorlevel%
+xcopy /y %TOPDIR%openssl-3.0\x64\bin\*.dll %INSTALL_ROOT%\bin
+if %errorlevel% neq 0 exit /b %errorlevel%
+xcopy /y %TOPDIR%openssl-3.0\x64\lib\*.lib %INSTALL_ROOT%\lib
+if %errorlevel% neq 0 exit /b %errorlevel%
+
+robocopy "%TOPDIR%mysql-8.4.2-winx64\include" "%INSTALL_ROOT%\include\mysql" /MIR /R:2 /NFL /NDL /NP
+if %errorlevel% geq 4 exit /b %errorlevel%
 
 robocopy "%INSTALL_ROOT%" "\\isis.cclrc.ac.uk\inst$\Kits$\CompGroup\ICP\ISISICP\POCO\%INSTALL_NAME%" /MIR /R:2 /NFL /NDL /NP
 if %errorlevel% geq 4 exit /b %errorlevel%
