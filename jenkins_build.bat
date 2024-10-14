@@ -12,11 +12,15 @@ REM    set "BUILD_TYPE=RelWithDebInfo"
 set "INSTALL_ROOT=%TOPDIR%\%INSTALL_NAME%"
 
 REM if updating poco make sure ISISICP is updated to same sqlite version bundled with poco
+set "MYSQLKITSDIR=\\isis.cclrc.ac.uk\inst$\kits$\CompGroup\ICP\MySQL"
+"c:\Program Files\7-Zip\7z.exe" x "%MYSQLKITSDIR%\mysql-8.4.2-winx64.zip" -aoa
+"c:\Program Files\7-Zip\7z.exe" x "%MYSQLKITSDIR%\mysql-8.4.2-winx64-debug-test.zip" -aoa
 
+REM we link against this 3.0.15 for the interface, but will use the EPICS build one
+REM at runtime because the EPICS one will be built against debug libraries
+REM when needed  
 set "KITSDIR=\\isis.cclrc.ac.uk\inst$\kits$\CompGroup\ICP\ISISICP\ThirdPartyKits"
 "c:\Program Files\7-Zip\7z.exe" x "%KITSDIR%\openssl-3.0.15.zip" -aoa
-"c:\Program Files\7-Zip\7z.exe" x "%KITSDIR%\mysql-8.4.2-winx64.zip" -aoa
-"c:\Program Files\7-Zip\7z.exe" x "%KITSDIR%\mysql-8.4.2-winx64-debug-test.zip" -aoa
 
 copy /y mysql-8.4.2-winx64\include\mysql.h mysql-8.4.2-winx64\include\mysql\mysql.h
 set "LINK=/LIBPATH:"%TOPDIR%mysql-8.4.2-winx64\lib""
